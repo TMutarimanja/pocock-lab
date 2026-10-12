@@ -57,3 +57,23 @@ test("busiestDayByCity uses the only day for a city with a single row", () => {
     [{ city: "Austin", date: "2026-09-30", rides: 7 }],
   );
 });
+
+test("busiestDayByCity breaks a tie with the earliest date when the later date comes first", () => {
+  const days = [
+    { date: "2026-08-29", city: "Boston", rides: "165" },
+    { date: "2026-08-23", city: "Boston", rides: "165" },
+  ];
+  assert.deepEqual(busiestDayByCity(days), [
+    { city: "Boston", date: "2026-08-23", rides: 165 },
+  ]);
+});
+
+test("busiestDayByCity breaks a tie with the earliest date when the earlier date comes first", () => {
+  const days = [
+    { date: "2026-08-23", city: "Boston", rides: 165 },
+    { date: "2026-08-29", city: "Boston", rides: 165 },
+  ];
+  assert.deepEqual(busiestDayByCity(days), [
+    { city: "Boston", date: "2026-08-23", rides: 165 },
+  ]);
+});
