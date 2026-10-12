@@ -50,3 +50,10 @@ test("busiestDayByCity compares string and number ride counts numerically", () =
 test("busiestDayByCity returns an empty list for no rows", () => {
   assert.deepEqual(busiestDayByCity([]), []);
 });
+
+test("busiestDayByCity uses the only day for a city with a single row", () => {
+  assert.deepEqual(
+    busiestDayByCity([{ date: "2026-09-30", city: "Austin", rides: "7" }]),
+    [{ city: "Austin", date: "2026-09-30", rides: 7 }],
+  );
+});
