@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en" class="metro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rides Metro</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./dashboard.css">
+</head>
+<body>
+  <header>
+    <nav><a href="./index.html">Home</a><a href="./busiest.html">Busiest days</a><a href="./dashboard.html" aria-current="page">Dashboard</a></nav>
+  </header>
+  <main>
+    <div class="sign">
+      <svg class="logo" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="3"/>
+        <path d="M11 27V13l9 9 9-9v14" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <h1>Rides Metro</h1>
+        <p>Every city is a line. Every day is a stop.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="group" id="line-toggles" role="group" aria-label="Lines"><span class="label">Lines</span></div>
+      <div class="group" id="zones" role="group" aria-label="Month"><span class="label">Zone</span></div>
+    </div>
+
+    <div class="tiles">
+      <div class="card tile"><div class="name">Total rides</div><div class="value" id="tile-total">&ndash;</div><div class="sub" id="tile-total-sub"></div></div>
+      <div class="card tile"><div class="name">Busiest day</div><div class="value" id="tile-busiest">&ndash;</div><div class="sub" id="tile-busiest-sub"></div></div>
+      <div class="card tile"><div class="name">Average ride count</div><div class="value" id="tile-average">&ndash;</div><div class="sub">per city, per day</div></div>
+    </div>
+
+    <section class="card">
+      <h2>Daily rides</h2>
+      <p class="hint">Hover or use the arrow keys to read a day. Each ringed station marks a line's busiest day.</p>
+      <div class="chart" id="chart"></div>
+    </section>
+
+    <section class="card">
+      <h2>Weekly rhythm</h2>
+      <p class="hint">Average ride count by day of the week.</p>
+      <div class="rhythm-wrap"><div class="rhythm" id="rhythm" role="table" aria-label="Average ride count by weekday"></div></div>
+      <div class="scale" aria-hidden="true"><span id="scale-low"></span><span class="ramp"></span><span id="scale-high"></span></div>
+    </section>
+
+    <section>
+      <div class="lines" id="line-cards"></div>
+    </section>
+
+    <details class="card">
+      <summary>Daily data table</summary>
+      <div class="table-wrap"><table id="data-table"></table></div>
+    </details>
+  </main>
+
+  <script type="module">
+    import { parseCsv } from "./src/csv.js";
+    import {
+      monthsIn, filterRows, dailySeries, weekdayAverages, cityStats, busiestOverall, niceMax, linePath,
+    } from "./src/dashboard.js";
+
+    const SVG = "http://www.w3.org/2000/svg";
+    const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const rows = parseCsv(await (await fetch("./data/rides.csv")).text());
+    const allCities = [...new Set(rows.map((row) => row.city))].sort((a, b) => a.localeCompare(b));
+    const allMonths = monthsIn(rows);
+
+    // Color follows the city, fixed by its place in the full list, so filters never repaint a line.
+    const lineColor = new Map(allCities.map((city, i) => [city, i < 8 ? `var(--series-${i + 1})` : "var(--series-other)"]));
+    const state = { month: "all", cities: new Set(allCities), focus: null };
+
+    const el = (tag, props = {}, ...children) => {
+      const node = document.createElement(tag);
+      Object.assign(node, props);
+      node.append(...children);
+      return node;
+    };
+    const svgEl = (tag, attrs = {}) => {
+      const node = document.createElementNS(SVG, tag);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      return node;
+    };
+    const bullet = (city) => {
+      const b = el("span", { className: "bullet", textContent: city[0].toUpperCase() });
+      b.setAttribute("aria-hidden", "true");
+      b.style.setProperty("--line", lineColor.get(city));
+      return b;
+    };
+    const num = (n) => Math.round(n).toLocaleString();
+    const day = (iso, opts) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", ...opts });
+    const longDay = (iso) => day(iso, { weekday: "short", month: "short", day: "numeric" });
+    const monthName = (ym) => day(`${ym}-01`, { month: "short" });
+
+    // Filter row
+    const toggles = document.getElementById("line-toggles");
+    for (const city of allCities) {
+      const button = el("button", { type: "button", className: "line-toggle" }, bullet(city), city);
+      button.style.setProperty("--line", lineColor.get(city));
+      button.setAttribute("aria-pressed", "true");
+      button.addEventListener("click", () => {
+        state.cities.has(city) ? state.cities.delete(city) : state.cities.add(city);
+        button.setAttribute("aria-pressed", String(state.cities.has(city)));
+        render();
+      });
+      toggles.append(button);
+    }
+    const zones = document.getElementById("zones");
+    for (const month of ["all", ...allMonths]) {
+      const button = el("button", { type: "button", className: "zone", textContent: month === "all" ? "All" : monthName(month) });
+      button.dataset.month = month;
+      button.addEventListener("click", () => {
+        state.month = month;
+        for (const b of zones.querySelectorAll(".zone")) b.setAttribute("aria-pressed", String(b.dataset.month === month));
+        render();
+      });
+      button.setAttribute("aria-pressed", String(month === "all"));
+      zones.append(button);
+    }
+
+    function render() {
+      const visible = filterRows(rows, { month: state.month, cities: [...state.cities] });
+      renderTiles(visible);
+      renderChart(visible);
+      renderRhythm(visible);
+      renderLineCards(visible);
+      renderTable(visible);
+    }
+
+    function renderTiles(visible) {
+      const total = visible.reduce((sum, row) => sum + Number(row.rides), 0);
+      document.getElementById("tile-total").textContent = num(total);
+      const sub = document.getElementById("tile-total-sub");
+      sub.replaceChildren(`${state.cities.size} of ${allCities.length} lines, ${state.month === "all" ? "all months" : monthName(state.month)}`);
+      const best = busiestOverall(visible);
+      document.getElementById("tile-busiest").textContent = best ? num(best.rides) : "–";
+      document.getElementById("tile-busiest-sub").replaceChildren(...(best ? [bullet(best.city), `${best.city}, ${longDay(best.date)}`] : []));
+      document.getElementById("tile-average").textContent = visible.length ? num(total / visible.length) : "–";
+    }
+
+    function renderChart(visible) {
+      const chart = document.getElementById("chart");
+      const { dates, series } = dailySeries(visible);
+      if (!dates.length) {
+        chart.replaceChildren(el("p", { className: "empty", textContent: "No lines selected. Pick a line above to see its route." }));
+        return;
+      }
+      const W = Math.round(Math.min(760, Math.max(300, chart.clientWidth || 760)));
+      const H = W < 520 ? 260 : 300, m = { top: 22, right: W < 520 ? 72 : 92, bottom: 28, left: 36 };
+      const w = W - m.left - m.right, h = H - m.top - m.bottom;
+      const max = niceMax(Math.max(...series.flatMap((s) => s.values.filter((v) => v !== null))));
+      const x = (i) => (dates.length > 1 ? (i / (dates.length - 1)) * w : w / 2);
+      const y = (v) => h - (v / max) * h;
+
+      const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, tabindex: "0", role: "img" });
+      svg.setAttribute("aria-label", `Daily rides for ${series.map((s) => s.city).join(", ")}. Use left and right arrow keys to read each day.`);
+      const plot = svgEl("g", { transform: `translate(${m.left},${m.top})` });
+      svg.append(plot);
+
+      for (let i = 0; i <= 4; i++) {
+        const v = (max / 4) * i;
+        plot.append(svgEl("line", { class: "gridline", x1: 0, x2: w, y1: y(v), y2: y(v) }));
+        const label = svgEl("text", { class: "axis-text", x: -8, y: y(v) + 4, "text-anchor": "end" });
+        label.textContent = num(v);
+        plot.append(label);
+      }
+      dates.forEach((date, i) => {
+        if (!date.endsWith("-01") && i !== 0) return;
+        const label = svgEl("text", { class: "axis-text", x: x(i), y: h + 20, "text-anchor": i === 0 ? "start" : "middle" });
+        label.textContent = day(date, { month: "short", day: "numeric" });
+        plot.append(label);
+      });
+
+      const stats = new Map(cityStats(visible).map((s) => [s.city, s]));
+      const lastY = [];
+      for (const { city, values } of series) {
+        const route = svgEl("path", { class: "route", d: linePath(values, { width: w, height: h, max }) });
+        route.style.setProperty("--line", lineColor.get(city));
+        plot.append(route);
+        // Drawn in by a CSS animation whose resting state is the full line, so it shows even if the animation never runs.
+        if (!reduceMotion) route.classList.add("draw");
+        const last = values.findLastIndex((v) => v !== null);
+        lastY.push({ city, y: y(values[last]), x: x(last) });
+      }
+
+      // Busiest-day stations, drawn above every route
+      for (const { city } of series) {
+        const { busiest } = stats.get(city);
+        const i = dates.indexOf(busiest.date);
+        const station = svgEl("circle", { class: "station", cx: x(i), cy: y(busiest.rides), r: 6 });
+        station.style.setProperty("--line", lineColor.get(city));
+        const label = svgEl("text", { class: "station-text", x: x(i), y: y(busiest.rides) - 11, "text-anchor": "middle" });
+        label.textContent = num(busiest.rides);
+        plot.append(station, label);
+      }
+
+      // Direct labels at the end of each line, nudged apart so they never overlap
+      lastY.sort((a, b) => a.y - b.y);
+      for (let i = 1; i < lastY.length; i++) lastY[i].y = Math.max(lastY[i].y, lastY[i - 1].y + 16);
+      for (const { city, y: ly, x: lx } of lastY) {
+        const dot = svgEl("circle", { cx: lx + 12, cy: ly, r: 4, fill: lineColor.get(city) });
+        const label = svgEl("text", { class: "end-label", x: lx + 21, y: ly + 4 });
+        label.textContent = city;
+        plot.append(dot, label);
+      }
+
+      // Hover layer: crosshair snaps to the nearest day; one tooltip lists every line
+      const hover = svgEl("g", { visibility: "hidden" });
+      const crosshair = svgEl("line", { class: "crosshair", y1: 0, y2: h });
+      hover.append(crosshair);
+      const dots = series.map(({ city }) => {
+        const d = svgEl("circle", { class: "hover-dot", r: 5 });
+        d.style.setProperty("--line", lineColor.get(city));
+        hover.append(d);
+        return d;
+      });
+      plot.append(hover);
+      plot.append(svgEl("rect", { x: 0, y: 0, width: w, height: h, fill: "transparent" }));
+
+      const tip = el("div", { className: "tooltip", hidden: true });
+      tip.setAttribute("role", "status");
+      const show = (i) => {
+        state.focus = dates[i];
+        hover.setAttribute("visibility", "visible");
+        crosshair.setAttribute("x1", x(i));
+        crosshair.setAttribute("x2", x(i));
+        series.forEach(({ values }, s) => {
+          const v = values[i];
+          dots[s].setAttribute("visibility", v === null ? "hidden" : "visible");
+          if (v !== null) { dots[s].setAttribute("cx", x(i)); dots[s].setAttribute("cy", y(v)); }
+        });
+        const lines = [...series]
+          .map(({ city, values }) => ({ city, v: values[i] }))
+          .filter(({ v }) => v !== null)
+          .sort((a, b) => b.v - a.v)
+          .map(({ city, v }) => {
+            const key = el("span", { className: "key" });
+            key.style.setProperty("--line", lineColor.get(city));
+            return el("div", { className: "row" }, key, el("strong", { textContent: num(v) }), el("span", { className: "city", textContent: city }));
+          });
+        tip.replaceChildren(el("div", { className: "when", textContent: longDay(dates[i]) }), ...lines);
+        tip.hidden = false;
+        const box = svg.getBoundingClientRect();
+        const px = ((m.left + x(i)) / W) * box.width;
+        const flip = px > box.width / 2;
+        tip.style.left = flip ? "" : `${px + 12}px`;
+        tip.style.right = flip ? `${box.width - px + 12}px` : "";
+        tip.style.top = `${(m.top / H) * box.height}px`;
+      };
+      const hide = () => { hover.setAttribute("visibility", "hidden"); tip.hidden = true; };
+      const nearest = (event) => {
+        const box = svg.getBoundingClientRect();
+        const px = ((event.clientX - box.left) / box.width) * W - m.left;
+        return Math.max(0, Math.min(dates.length - 1, Math.round((px / w) * (dates.length - 1))));
+      };
+      svg.addEventListener("pointermove", (event) => show(nearest(event)));
+      svg.addEventListener("pointerleave", () => { if (document.activeElement !== svg) hide(); });
+      svg.addEventListener("focus", () => show(Math.max(0, dates.indexOf(state.focus))));
+      svg.addEventListener("blur", hide);
+      svg.addEventListener("keydown", (event) => {
+        const at = Math.max(0, dates.indexOf(state.focus));
+        const next = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: dates.length - 1 }[event.key];
+        if (next === undefined) return;
+        event.preventDefault();
+        show(Math.max(0, Math.min(dates.length - 1, next)));
+      });
+
+      chart.replaceChildren(svg, tip);
+      for (const route of svg.querySelectorAll(".route.draw")) route.style.setProperty("--len", Math.ceil(route.getTotalLength()));
+    }
+
+    function renderRhythm(visible) {
+      const grid = document.getElementById("rhythm");
+      const data = weekdayAverages(visible);
+      const all = data.flatMap((d) => d.averages).filter((v) => v !== null);
+      const lo = Math.min(...all), hi = Math.max(...all);
+      const head = (text) => { const c = el("div", { className: "head", textContent: text }); c.setAttribute("role", "columnheader"); return c; };
+      const cells = [head(""), ...WEEKDAYS.map(head)];
+      for (const { city, averages } of data) {
+        const who = el("div", { className: "who" }, bullet(city), city);
+        who.setAttribute("role", "rowheader");
+        cells.push(who);
+        averages.forEach((v, d) => {
+          const t = v === null || hi === lo ? 0.5 : (v - lo) / (hi - lo);
+          const cell = el("div", { className: `cell${t > 0.55 ? " high" : ""}`, textContent: v === null ? "–" : num(v), tabIndex: 0 });
+          cell.style.setProperty("--t", `${Math.round(t * 100)}%`);
+          cell.setAttribute("role", "cell");
+          cell.title = v === null ? `${city}, ${WEEKDAYS[d]}: no data` : `${city}, ${WEEKDAYS[d]}: ${num(v)} rides on average`;
+          cells.push(cell);
+        });
+      }
+      grid.replaceChildren(...(data.length ? cells : [el("p", { className: "empty", textContent: "No lines selected." })]));
+      document.getElementById("scale-low").textContent = all.length ? `${num(lo)} fewer` : "";
+      document.getElementById("scale-high").textContent = all.length ? `more ${num(hi)}` : "";
+    }
+
+    function renderLineCards(visible) {
+      const cards = cityStats(visible).map(({ city, total, average, busiest }) => {
+        const card = el("article", { className: "card line-card" });
+        card.style.setProperty("--line", lineColor.get(city));
+        const dl = el("dl");
+        for (const [term, value] of [["Total rides", num(total)], ["Average per day", num(average)], ["Busiest day", `${longDay(busiest.date)} · ${num(busiest.rides)}`]]) {
+          dl.append(el("dt", { textContent: term }), el("dd", { textContent: value }));
+        }
+        card.append(el("h3", {}, bullet(city), `${city} line`), dl);
+        return card;
+      });
+      document.getElementById("line-cards").replaceChildren(...cards);
+    }
+
+    function renderTable(visible) {
+      const { dates, series } = dailySeries(visible);
+      const table = document.getElementById("data-table");
+      const head = el("tr", {}, el("th", { textContent: "Date" }), ...series.map((s) => el("th", { textContent: s.city })));
+      const body = dates.map((date, i) => el("tr", {}, el("td", { textContent: date }), ...series.map((s) => el("td", { textContent: s.values[i] === null ? "–" : num(s.values[i]) }))));
+      table.replaceChildren(el("thead", {}, head), el("tbody", {}, ...body));
+    }
+
+    render();
+
+    // Redraw the chart when its width changes, so labels keep their real size on any screen.
+    let lastWidth = document.getElementById("chart").clientWidth;
+    new ResizeObserver(() => {
+      const width = document.getElementById("chart").clientWidth;
+      if (Math.abs(width - lastWidth) < 24) return;
+      lastWidth = width;
+      renderChart(filterRows(rows, { month: state.month, cities: [...state.cities] }));
+    }).observe(document.getElementById("chart"));
+  </script>
+</body>
+</html>
