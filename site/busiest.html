@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Busiest days</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header>
+    <h1>Busiest days</h1>
+    <nav><a href="./index.html">Home</a><a href="./busiest.html">Busiest days</a></nav>
+  </header>
+  <main>
+    <p>Each city's busiest day: the date with the highest ride count.</p>
+    <table id="busiest">
+      <thead><tr><th>City</th><th>Date</th><th>Rides</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </main>
+  <script type="module">
+    import { parseCsv } from "./src/csv.js";
+    import { busiestDayByCity } from "./src/stats.js";
+
+    const response = await fetch("./data/rides.csv");
+    const rows = parseCsv(await response.text());
+
+    const tbody = document.querySelector("#busiest tbody");
+    for (const { city, date, rides } of busiestDayByCity(rows)) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${city}</td><td>${date}</td><td>${rides.toLocaleString()}</td>`;
+      tbody.appendChild(tr);
+    }
+  </script>
+</body>
+</html>
