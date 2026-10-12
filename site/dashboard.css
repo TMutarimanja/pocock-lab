@@ -1,0 +1,203 @@
+/* Rides Metro: the interactive dashboard, styled as a transit map. */
+.metro {
+  color-scheme: light;
+  --surface-0: #f4f3ef;
+  --surface-1: #fcfcfb;
+  --hairline: #e3e1da;
+  --grid: #ebe9e3;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --signage: #16181d;
+  --signage-ink: #f6f5f1;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+  --series-other: #8f8d86;
+  --seq-low: #cde2fb;
+  --seq-high: #104281;
+  --seq-ink-low: #0b0b0b;
+  --seq-ink-high: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root.metro:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --hairline: #2e2e2c;
+    --grid: #262624;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --signage: #f0efec;
+    --signage-ink: #111110;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --series-other: #75736d;
+    --seq-low: #1e2633;
+    --seq-high: #86b6ef;
+    --seq-ink-low: #f0efec;
+    --seq-ink-high: #0b0b0b;
+  }
+}
+
+.metro { background: var(--surface-0); color: var(--text-primary); }
+.metro body { max-width: 64rem; }
+.metro header { border-bottom: 0; margin-bottom: 1rem; }
+.metro nav a { color: var(--text-secondary); }
+.metro nav a[aria-current="page"] { color: var(--text-primary); font-weight: 600; text-decoration: none; }
+
+/* Station-sign title bar */
+.sign {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: var(--signage);
+  color: var(--signage-ink);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  margin: 0.5rem 0 1rem;
+}
+.sign h1 { margin: 0; font-size: 1.6rem; letter-spacing: 0.02em; line-height: 1.1; }
+.sign p { margin: 0; opacity: 0.75; font-size: 0.9rem; }
+.sign .logo { flex: none; width: 2.6rem; height: 2.6rem; }
+
+/* Line bullets: the round city badges used everywhere a city is named */
+.bullet {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--line);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* Filter row */
+.controls { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; margin-bottom: 1rem; }
+.controls .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-right: 0.4rem; }
+.group { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.line-toggle, .zone {
+  font: inherit;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--hairline);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 0.25rem 0.8rem 0.25rem 0.3rem;
+  cursor: pointer;
+}
+.zone { padding: 0.35rem 0.85rem; }
+.line-toggle[aria-pressed="false"] { color: var(--text-muted); }
+.line-toggle[aria-pressed="false"] .bullet { background: transparent; color: var(--text-muted); box-shadow: inset 0 0 0 2px var(--line); }
+.zone[aria-pressed="true"] { background: var(--signage); color: var(--signage-ink); border-color: var(--signage); }
+.line-toggle:hover, .zone:hover { border-color: var(--text-muted); }
+.line-toggle:focus-visible, .zone:focus-visible, .chart svg:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+
+/* Cards and stat tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem; }
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+  min-width: 0;
+}
+.card h2 { font-size: 1rem; margin: 0 0 0.2rem; }
+.card .hint { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--text-muted); }
+.tile .name { font-size: 0.8rem; color: var(--text-secondary); }
+.tile .value { font-size: 1.9rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tile .sub { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-secondary); }
+.tile .sub .bullet { width: 1.25rem; height: 1.25rem; font-size: 0.7rem; }
+
+/* Line chart */
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .axis-text { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .end-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+.chart .route { fill: none; stroke: var(--line); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.chart .route.draw { stroke-dasharray: var(--len); animation: draw 900ms ease-out; }
+@keyframes draw { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+.chart .station { fill: var(--surface-1); stroke: var(--line); stroke-width: 3; }
+.chart .station-text { paint-order: stroke; stroke: var(--surface-1); stroke-width: 4px; stroke-linejoin: round; fill: var(--text-primary); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart .crosshair { stroke: var(--text-muted); stroke-width: 1; }
+.chart .hover-dot { fill: var(--line); stroke: var(--surface-1); stroke-width: 2; }
+.empty { color: var(--text-muted); padding: 2rem 0; text-align: center; }
+
+.tooltip {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8rem;
+  min-width: 9rem;
+  z-index: 1;
+}
+.tooltip[hidden] { display: none; }
+.tooltip .when { color: var(--text-secondary); margin-bottom: 0.3rem; }
+.tooltip .row { display: flex; align-items: center; gap: 0.45rem; }
+.tooltip .key { width: 0.9rem; height: 3px; border-radius: 2px; background: var(--line); flex: none; }
+.tooltip strong { font-variant-numeric: tabular-nums; min-width: 2.2rem; }
+.tooltip .city { color: var(--text-secondary); }
+
+/* Weekly rhythm heatmap */
+.rhythm-wrap { overflow-x: auto; }
+.rhythm { display: grid; grid-template-columns: minmax(4.5rem, auto) repeat(7, minmax(1.9rem, 1fr)); gap: 3px; font-size: 0.8rem; }
+.rhythm .head { color: var(--text-muted); text-align: center; padding-bottom: 0.2rem; }
+.rhythm .who { display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary); }
+.rhythm .who .bullet { width: 1.2rem; height: 1.2rem; font-size: 0.65rem; }
+.rhythm .cell {
+  border-radius: 4px;
+  padding: 0.45rem 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in oklab, var(--seq-high) var(--t), var(--seq-low));
+  color: var(--seq-ink-low);
+  cursor: default;
+}
+.rhythm .cell.high { color: var(--seq-ink-high); }
+.rhythm .cell:hover, .rhythm .cell:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+.scale { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; font-size: 0.75rem; color: var(--text-muted); }
+.scale .ramp { width: 8rem; height: 0.5rem; border-radius: 999px; background: linear-gradient(to right, var(--seq-low), var(--seq-high)); }
+
+/* Line cards */
+.lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; }
+.line-card { border-top: 6px solid var(--line); }
+.line-card h3 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.5rem; font-size: 1rem; }
+.line-card dl { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.8rem; margin: 0; font-size: 0.85rem; }
+.line-card dt { color: var(--text-secondary); }
+.line-card dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+details.card summary { cursor: pointer; font-weight: 600; }
+.table-wrap { overflow-x: auto; max-height: 24rem; margin-top: 0.6rem; }
+.metro table { margin: 0; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+.metro th, .metro td { border-color: var(--hairline); }
+.metro th { background: var(--surface-0); position: sticky; top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chart .route.draw { animation: none; }
+}
