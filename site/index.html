@@ -22,10 +22,20 @@
       </table>
       <div id="chart" class="bars" role="img" aria-label="Bar chart of rides by city"></div>
     </section>
+    <section id="pick-a-day">
+      <h2>Pick a day</h2>
+      <p>Choose a date to see each city's rides that day. The dark line on each bar marks that city's usual (average) day.</p>
+      <div class="day-picker">
+        <button type="button" id="prev-day" aria-label="Previous day">&larr;</button>
+        <label>Date <input type="date" id="day"></label>
+        <button type="button" id="next-day" aria-label="Next day">&rarr;</button>
+      </div>
+      <ul id="day-results" class="day-results" aria-live="polite"></ul>
+    </section>
   </main>
   <script type="module">
     import { parseCsv } from "./src/csv.js";
-    import { totalRides, ridesByCity } from "./src/stats.js";
+    import { totalRides, ridesByCity, busiestDayByCity, dayVsUsual } from "./src/stats.js";
 
     const response = await fetch("./data/rides.csv");
     const rows = parseCsv(await response.text());
@@ -48,6 +58,61 @@
       bar.textContent = `${city} ${rides.toLocaleString()}`;
       chart.appendChild(bar);
     }
+
+    // Pick a day: one row per city, a bar for that day's rides with a tick at its usual level.
+    const dates = [...new Set(rows.map((row) => row.date))].sort();
+    const dayInput = document.getElementById("day");
+    const results = document.getElementById("day-results");
+    const scale = Math.max(...busiestDayByCity(rows).map((d) => d.rides));
+    dayInput.min = dates[0];
+    dayInput.max = dates.at(-1);
+    dayInput.value = dates.at(-1);
+
+    function showDay() {
+      const date = dayInput.value;
+      document.getElementById("prev-day").disabled = date <= dates[0];
+      document.getElementById("next-day").disabled = date >= dates.at(-1);
+      results.replaceChildren();
+      for (const { city, rides, usual, change } of dayVsUsual(rows, date)) {
+        const li = document.createElement("li");
+        const name = document.createElement("span");
+        name.className = "day-city";
+        name.textContent = city;
+        const track = document.createElement("span");
+        track.className = "day-track";
+        const fill = document.createElement("span");
+        fill.className = "day-fill";
+        fill.style.width = `${((rides ?? 0) / scale) * 100}%`;
+        const tick = document.createElement("span");
+        tick.className = "day-usual";
+        tick.style.left = `${(usual / scale) * 100}%`;
+        tick.title = `Usual: ${Math.round(usual)} rides`;
+        track.append(fill, tick);
+        const note = document.createElement("span");
+        note.className = "day-note";
+        if (rides === null) {
+          note.textContent = "No data";
+        } else {
+          const percent = Math.round(change * 100);
+          const word = percent > 0 ? "above" : percent < 0 ? "below" : "right on";
+          note.textContent = `${rides} rides, ${percent === 0 ? "" : `${Math.abs(percent)}% `}${word} usual`;
+          li.dataset.trend = percent > 0 ? "up" : percent < 0 ? "down" : "same";
+        }
+        li.append(name, track, note);
+        results.append(li);
+      }
+    }
+
+    function stepDay(by) {
+      const at = dates.indexOf(dayInput.value);
+      dayInput.value = dates[Math.min(dates.length - 1, Math.max(0, (at === -1 ? 0 : at) + by))];
+      showDay();
+    }
+
+    dayInput.addEventListener("change", showDay);
+    document.getElementById("prev-day").addEventListener("click", () => stepDay(-1));
+    document.getElementById("next-day").addEventListener("click", () => stepDay(1));
+    showDay();
   </script>
 </body>
 </html>
