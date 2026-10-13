@@ -22,10 +22,20 @@
       </table>
       <div id="chart" class="bars" role="img" aria-label="Bar chart of rides by city"></div>
     </section>
+    <section id="hot-streaks">
+      <h2>Hot streaks</h2>
+      <p>Each city's longest run of days in a row above its usual (average) ride count. Every square is one day; hover a square for its date and rides.</p>
+      <p class="streak-key" aria-hidden="true">
+        <span><i class="dot streak"></i>Hot streak</span>
+        <span><i class="dot above"></i>Above usual</span>
+        <span><i class="dot"></i>At or below usual</span>
+      </p>
+      <div id="streaks"></div>
+    </section>
   </main>
   <script type="module">
     import { parseCsv } from "./src/csv.js";
-    import { totalRides, ridesByCity } from "./src/stats.js";
+    import { totalRides, ridesByCity, hotStreaks } from "./src/stats.js";
 
     const response = await fetch("./data/rides.csv");
     const rows = parseCsv(await response.text());
@@ -47,6 +57,49 @@
       bar.style.width = `${(rides / max) * 100}%`;
       bar.textContent = `${city} ${rides.toLocaleString()}`;
       chart.appendChild(bar);
+    }
+
+    // Hot streaks: a headline per city, then one square per day with the streak lit up.
+    const day = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+    const streaks = hotStreaks(rows);
+    const longest = Math.max(...streaks.map((s) => s.length));
+    const list = document.getElementById("streaks");
+    for (const { city, usual, length, start, end, days } of streaks) {
+      const card = document.createElement("article");
+      card.className = "streak-card";
+      const title = document.createElement("h3");
+      title.textContent = city;
+      if (length > 0 && length === longest) {
+        const badge = document.createElement("span");
+        badge.className = "streak-badge";
+        badge.textContent = "Longest streak";
+        title.append(" ", badge);
+      }
+      const headline = document.createElement("p");
+      headline.className = "streak-headline";
+      headline.textContent = length === 0
+        ? `Never above its usual ${Math.round(usual)} rides.`
+        : `${length} ${length === 1 ? "day" : "days in a row"} above its usual ${Math.round(usual)} rides: ${day(start)}${length > 1 ? ` to ${day(end)}` : ""}.`;
+      const strip = document.createElement("div");
+      strip.className = "streak-strip";
+      strip.setAttribute("role", "img");
+      strip.setAttribute("aria-label", `${city}: ${days.filter((d) => d.above).length} of ${days.length} days above usual. ${headline.textContent}`);
+      for (const d of days) {
+        const dot = document.createElement("span");
+        dot.className = `dot${d.inStreak ? " streak" : d.above ? " above" : ""}`;
+        dot.title = `${day(d.date)}: ${d.rides} rides`;
+        strip.append(dot);
+      }
+      const ends = document.createElement("p");
+      ends.className = "streak-ends";
+      ends.setAttribute("aria-hidden", "true");
+      for (const iso of [days[0].date, days.at(-1).date]) {
+        const label = document.createElement("span");
+        label.textContent = day(iso);
+        ends.append(label);
+      }
+      card.append(title, headline, strip, ends);
+      list.append(card);
     }
   </script>
 </body>
