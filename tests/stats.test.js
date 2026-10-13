@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { totalRides, ridesByCity, busiestDayByCity } from "../site/src/stats.js";
+import { totalRides, ridesByCity, busiestDayByCity, dayVsUsual } from "../site/src/stats.js";
 
 const rows = [
   { date: "2026-07-01", city: "Miami", rides: "10" },
@@ -76,4 +76,20 @@ test("busiestDayByCity breaks a tie with the earliest date when the earlier date
   assert.deepEqual(busiestDayByCity(days), [
     { city: "Boston", date: "2026-08-23", rides: 165 },
   ]);
+});
+
+test("dayVsUsual compares each city's ride count on a date with its daily average", () => {
+  // Boston averages 25 (20 and 30); Miami's only day is 10.
+  assert.deepEqual(dayVsUsual(rows, "2026-07-02"), [
+    { city: "Boston", rides: 30, usual: 25, change: 0.2 },
+    { city: "Miami", rides: null, usual: 10, change: null },
+  ]);
+});
+
+test("dayVsUsual reports a below-average day as a negative change", () => {
+  assert.deepEqual(dayVsUsual(rows, "2026-07-01")[0], { city: "Boston", rides: 20, usual: 25, change: -0.2 });
+});
+
+test("dayVsUsual of no rows is empty", () => {
+  assert.deepEqual(dayVsUsual([], "2026-07-01"), []);
 });
