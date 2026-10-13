@@ -7,3 +7,16 @@ th, td { border: 1px solid #d0d0d0; padding: 0.3rem 0.8rem; text-align: left; }
 th { background: #f2f2f2; }
 .bars { display: flex; flex-direction: column; gap: 0.4rem; margin: 1rem 0; }
 .bar { background: #028090; color: #ffffff; padding: 0.3rem 0.6rem; border-radius: 3px; white-space: nowrap; min-width: 6rem; }
+.streak-key { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.85rem; color: #555555; }
+.streak-key span { display: inline-flex; align-items: center; gap: 0.35rem; }
+#streaks { display: grid; gap: 1rem; margin-top: 0.5rem; }
+.streak-card h3 { margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; }
+.streak-badge { font-size: 0.75rem; font-weight: 600; color: #ffffff; background: #c2410c; border-radius: 999px; padding: 0.1rem 0.55rem; }
+.streak-headline { margin: 0.2rem 0 0.5rem; }
+.streak-strip { display: flex; gap: 2px; }
+.dot { display: inline-block; flex: 1 1 0; min-width: 2px; height: 1.1rem; border-radius: 2px; background: #e4e4e4; }
+.streak-key .dot { flex: none; width: 0.8rem; height: 0.8rem; }
+.dot.above { background: #9fd0d5; }
+.dot.streak { background: #c2410c; }
+.streak-ends { display: flex; justify-content: space-between; margin: 0.2rem 0 0; font-size: 0.75rem; color: #6b6b6b; }
+@media (max-width: 500px) { .streak-strip { gap: 1px; } }

@@ -28,3 +28,42 @@ export function busiestDayByCity(rows) {
   }
   return [...busiest.values()].sort((a, b) => a.city.localeCompare(b.city));
 }
+
+// Each city's hot streak: its longest run of consecutive dates with a ride count above its
+// usual (average) ride count, earliest run on a tie. A missing date breaks a run. days lists
+// every date in order, flagged above usual and inside the streak. Sorted by city name.
+export function hotStreaks(rows) {
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  const time = (date) => Date.parse(`${date}T00:00:00Z`);
+  const byCity = new Map();
+  for (const row of rows) {
+    if (!byCity.has(row.city)) byCity.set(row.city, []);
+    byCity.get(row.city).push({ date: row.date, rides: Number(row.rides) });
+  }
+  return [...byCity.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([city, entries]) => {
+      entries.sort((a, b) => a.date.localeCompare(b.date));
+      const usual = entries.reduce((sum, e) => sum + e.rides, 0) / entries.length;
+      let best = { length: 0, from: -1 };
+      let run = { length: 0, from: -1 };
+      entries.forEach((entry, i) => {
+        const continues = i > 0 && time(entry.date) - time(entries[i - 1].date) === ONE_DAY;
+        if (entry.rides > usual) {
+          run = continues && run.length > 0 ? { length: run.length + 1, from: run.from } : { length: 1, from: i };
+          if (run.length > best.length) best = run;
+        } else {
+          run = { length: 0, from: -1 };
+        }
+      });
+      const inStreak = (i) => best.length > 0 && i >= best.from && i < best.from + best.length;
+      return {
+        city,
+        usual,
+        length: best.length,
+        start: best.length ? entries[best.from].date : null,
+        end: best.length ? entries[best.from + best.length - 1].date : null,
+        days: entries.map((e, i) => ({ date: e.date, rides: e.rides, above: e.rides > usual, inStreak: inStreak(i) })),
+      };
+    });
+}
